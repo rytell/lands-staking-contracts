@@ -182,5 +182,7 @@ describe("Stake Lands", function () {
     expect(landCollectionsAvailable).to.equal(0);
   });
 
-  
+  it("Should let stakers stake heroes with lands", async () => {
+    expect(true).to.equal(false);
+  });
 });
