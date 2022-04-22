@@ -7,10 +7,9 @@ describe("Stake Lands", function () {
   let owner: SignerWithAddress;
   let stakers: SignerWithAddress[];
   const landCollections: Contract[] = [];
-  const LAND_COLLECTIONS_TO_DEPLOY = 19; // 17 mintable lands + 2 claimable lands
+  const LAND_COLLECTIONS_TO_DEPLOY = 18; // 17 mintable lands + 2 claimable lands
   let stakeLands: Contract;
   let heros: Contract;
-  let seals: Contract; // rytell seals
 
   let testWavax: any;
   let testUsdc: any;
@@ -20,7 +19,7 @@ describe("Stake Lands", function () {
   let avaxUsdc: any;
   let avaxRadi: any;
   let priceCalculator: any;
-  const BASE_USD_PRICE = 300;
+  const BASE_USD_PRICE = 1;
   const INITIAL_USDC_INJECTION_AMOUNT = "750000";
 
   const testDeployAmount = ethers.utils.parseEther("1000000000").toString();
@@ -117,6 +116,12 @@ describe("Stake Lands", function () {
       );
       await landCollections[index].deployed();
       await landCollections[index].pause(false);
+      // should not revert if allowed and enough
+      await avaxRadi.approve(
+        landCollections[index].address,
+        ethers.constants.MaxUint256
+      );
+      await landCollections[index].mint(8);
     }
 
     /** HEROS */
@@ -129,60 +134,180 @@ describe("Stake Lands", function () {
     await heros.deployed();
     await heros.pause(false);
     await heros.reveal();
-    await heros
-      .connect(stakers[0])
-      .mint(6, { value: ethers.utils.parseEther("15") });
-
-    await heros
-      .connect(stakers[1])
-      .mint(4, { value: ethers.utils.parseEther("10") });
-
-    /** SEALS */
-    const CryptoSeals = await ethers.getContractFactory("CryptoSeals");
-    seals = await CryptoSeals.deploy();
-    await seals.deployed();
-
-    await seals.startDrop();
-
-    // mint some
-    await seals
-      .connect(owner)
-      .summonSeal(20, { value: ethers.utils.parseEther("6") });
+    await heros.mint(5, { value: ethers.utils.parseEther("12.5") });
 
     const StakeLands = await ethers.getContractFactory("StakeLands");
-    stakeLands = await StakeLands.deploy(heros.address, seals.address);
+    // @ts-ignore
+    stakeLands = await StakeLands.deploy(heros.address);
     await stakeLands.deployed();
   });
 
-  it("Should compile", async function () {
-    console.log("landCollections: ", landCollections.length);
-    console.log("stakers: ", stakers.length);
-    console.log("stake lands contract: ", stakeLands.address);
-    expect(true).to.equal(true);
-  });
+  // it("Should compile", async function () {
+  //   console.log("landCollections: ", landCollections.length);
+  //   console.log("stakers: ", stakers.length);
+  //   console.log("stake lands contract: ", stakeLands.address);
+  //   expect(true).to.equal(true);
+  // });
 
-  it("Should let owner add collections after deployment", async function () {
-    for (let index = 2; index < LAND_COLLECTIONS_TO_DEPLOY; index++) {
+  // it("Should let owner add collections after deployment", async function () {
+  //   for (let index = 0; index < LAND_COLLECTIONS_TO_DEPLOY; index++) {
+  //     await expect(stakeLands.addLandCollection(landCollections[index].address))
+  //       .not.to.be.reverted;
+  //   }
+
+  //   const landCollectionsAvailable = await stakeLands.landCollectionsSize();
+  //   expect(landCollectionsAvailable).to.equal(LAND_COLLECTIONS_TO_DEPLOY - 2);
+  // });
+
+  // it("Should let owner remove collections", async function () {
+  //   for (let index = 2; index < LAND_COLLECTIONS_TO_DEPLOY; index++) {
+  //     await expect(
+  //       stakeLands.removeLandCollection(landCollections[index].address)
+  //     ).not.to.be.reverted;
+  //   }
+
+  //   const landCollectionsAvailable = await stakeLands.landCollectionsSize();
+  //   expect(landCollectionsAvailable).to.equal(0);
+  // });
+
+  it("Should let stakers initiate stake heroes with lands and unstake", async () => {
+    // whitelist collections
+    for (let index = 0; index < LAND_COLLECTIONS_TO_DEPLOY; index++) {
       await expect(stakeLands.addLandCollection(landCollections[index].address))
         .not.to.be.reverted;
+
+      // approve lands of this collection
+      await landCollections[index].setApprovalForAll(stakeLands.address, true);
     }
 
-    const landCollectionsAvailable = await stakeLands.landCollectionsSize();
-    expect(landCollectionsAvailable).to.equal(LAND_COLLECTIONS_TO_DEPLOY - 2);
-  });
+    // Approve for all heros
+    await heros.setApprovalForAll(stakeLands.address, true);
 
-  it("Should let owner remove collections", async function () {
-    for (let index = 2; index < LAND_COLLECTIONS_TO_DEPLOY; index++) {
+    const herosOnWallet = await heros.walletOfOwner(owner.address);
+    for (let heroIndex = 0; heroIndex < 4; heroIndex++) {
+      const landsForHero = [];
+      const collectionsForHero = [];
+      for (let collectionIndex = 0; collectionIndex < 8; collectionIndex++) {
+        collectionsForHero.push(landCollections[collectionIndex].address);
+        const ownLands = await landCollections[collectionIndex].walletOfOwner(
+          owner.address
+        );
+        landsForHero.push(ownLands[heroIndex]);
+      }
       await expect(
-        stakeLands.removeLandCollection(landCollections[index].address)
+        stakeLands.stakeHeroWithLands(
+          herosOnWallet[heroIndex],
+          landsForHero,
+          collectionsForHero
+        )
       ).not.to.be.reverted;
     }
 
-    const landCollectionsAvailable = await stakeLands.landCollectionsSize();
-    expect(landCollectionsAvailable).to.equal(0);
+    await expect(stakeLands.unstakeHero(herosOnWallet[0])).not.to.be.reverted;
+
+    // const stakedHero = await stakeLands.stakedHeros(owner.address, 0);
+    // console.log("hero: ", stakedHero, " end of hero");
+    // console.log(
+    //   "hero lands: ",
+    //   await stakeLands.getHeroLands(owner.address, stakedHero.heroId)
+    // );
   });
 
-  it("Should let stakers stake heroes with lands", async () => {
-    expect(true).to.equal(false);
+  it("Should let a staker add a land to a hero and remove all but one", async () => {
+    // whitelist collections
+    for (let index = 0; index < LAND_COLLECTIONS_TO_DEPLOY; index++) {
+      await expect(stakeLands.addLandCollection(landCollections[index].address))
+        .not.to.be.reverted;
+
+      // approve lands of this collection
+      await landCollections[index].setApprovalForAll(stakeLands.address, true);
+    }
+
+    // Approve for all heros
+    await heros.setApprovalForAll(stakeLands.address, true);
+
+    const herosOnWallet = await heros.walletOfOwner(owner.address);
+    const landsForHero = [];
+    const collectionsForHero = [];
+
+    for (let collectionIndex = 0; collectionIndex < 6; collectionIndex++) {
+      collectionsForHero.push(landCollections[collectionIndex].address);
+      const ownLands = await landCollections[collectionIndex].walletOfOwner(
+        owner.address
+      );
+      landsForHero.push(ownLands[0]);
+    }
+
+    await expect(
+      stakeLands.stakeHeroWithLands(
+        herosOnWallet[0],
+        landsForHero,
+        collectionsForHero
+      )
+    ).not.to.be.reverted;
+
+    const additionalLandsForHero = [];
+    const additionalCollectionsForHero = [];
+
+    for (let collectionIndex = 6; collectionIndex < 8; collectionIndex++) {
+      additionalCollectionsForHero.push(
+        landCollections[collectionIndex].address
+      );
+      const ownLands = await landCollections[collectionIndex].walletOfOwner(
+        owner.address
+      );
+      additionalLandsForHero.push(ownLands[0]);
+    }
+
+    await expect(
+      stakeLands.addLandsToHero(
+        herosOnWallet[0],
+        additionalCollectionsForHero,
+        additionalLandsForHero
+      )
+    ).not.to.be.reverted;
+
+    // shouldn't allow a ninth land
+    const ninthCollectionForHero = landCollections[9].address;
+    const ownLands = await landCollections[9].walletOfOwner(owner.address);
+    const ninthLandForHero = ownLands[0];
+    await expect(
+      stakeLands.addLandsToHero(
+        herosOnWallet[0],
+        [ninthCollectionForHero],
+        [ninthLandForHero]
+      )
+    ).to.be.revertedWith("MAX_LANDS_PER_HERO exceeded with additional lands");
+
+    const landsToRemove = [];
+    const landCollectionsToRemove = [];
+
+    // should allow to remove 7 lands
+    for (let collectionIndex = 0; collectionIndex < 7; collectionIndex++) {
+      landCollectionsToRemove.push(landCollections[collectionIndex].address);
+      const ownLands = await landCollections[collectionIndex].walletOfOwner(
+        owner.address
+      );
+      landsToRemove.push(ownLands[0]);
+    }
+
+    await expect(
+      stakeLands.removeLandsFromHero(
+        herosOnWallet[0],
+        landCollectionsToRemove,
+        landsToRemove
+      )
+    ).not.to.be.reverted;
+
+    // should not allow to remove all lands
+    const eighthCollection = landCollections[7].address;
+    const eighthLands = await landCollections[7].walletOfOwner(owner.address);
+    await expect(
+      stakeLands.removeLandsFromHero(
+        herosOnWallet[0],
+        [eighthCollection],
+        [eighthLands[0]]
+      )
+    ).to.be.revertedWith("a hero must be staked at least with one land");
   });
 });
