@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "hardhat/console.sol";
 
 interface IRytellHero {
     function walletOfOwner(address owner_)
@@ -282,6 +283,9 @@ contract StakeLands is Ownable, IERC721Receiver {
         uint256 time = block.timestamp;
         /** lands */
         for (uint256 landIndex = 0; landIndex < lands.length; landIndex++) {
+            if (collections[landIndex] == address(0)) {
+                continue;
+            }
             require(
                 collectionIsWhitelisted(collections[landIndex]),
                 "Collection is not whitelisted"
@@ -640,16 +644,46 @@ contract StakeLands is Ownable, IERC721Receiver {
                 heroCollections[landIndex] != address(0) &&
                 stakedStatus[landIndex] != false
             ) {
-                _unstakeLand(heroCollections[landIndex], heroLands[landIndex]);
-                emit RemovedLandFromHero(
-                    msg.sender,
-                    hero,
-                    time,
-                    heroCollections[landIndex],
-                    heroLands[landIndex]
-                );
+                for (
+                    uint256 removalIndex = 0;
+                    removalIndex < lands.length;
+                    removalIndex++
+                ) {
+                    if (
+                        lands[removalIndex] == heroLands[landIndex] &&
+                        collections[removalIndex] == heroCollections[landIndex]
+                    ) {
+                        _unstakeLand(
+                            heroCollections[landIndex],
+                            heroLands[landIndex]
+                        );
+                        emit RemovedLandFromHero(
+                            msg.sender,
+                            hero,
+                            time,
+                            heroCollections[landIndex],
+                            heroLands[landIndex]
+                        );
+                    }
+                }
             }
         }
         emit UnstakedHeroWithLands(msg.sender, hero, time);
+    }
+
+    function swapHero(uint256 targetHero, uint256 newHero) public {
+        require(senderStakedHero(targetHero), "You didn't stake this hero");
+        require(senderOwnsHero(newHero), "Must own the hero you want to stake");
+
+        LandStatus[] storage lands = stakedLands[msg.sender];
+        for (uint256 index = 0; index < lands.length; index++) {
+            if (lands[index].heroId == targetHero) {
+                lands[index].heroId = newHero;
+            }
+        }
+
+        unstakeHero(targetHero);
+        acquireHeroOwnership(newHero);
+        _setHeroStaked(newHero, block.timestamp);
     }
 }

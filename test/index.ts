@@ -142,33 +142,33 @@ describe("Stake Lands", function () {
     await stakeLands.deployed();
   });
 
-  // it("Should compile", async function () {
-  //   console.log("landCollections: ", landCollections.length);
-  //   console.log("stakers: ", stakers.length);
-  //   console.log("stake lands contract: ", stakeLands.address);
-  //   expect(true).to.equal(true);
-  // });
+  it("Should compile", async function () {
+    console.log("landCollections: ", landCollections.length);
+    console.log("stakers: ", stakers.length);
+    console.log("stake lands contract: ", stakeLands.address);
+    expect(true).to.equal(true);
+  });
 
-  // it("Should let owner add collections after deployment", async function () {
-  //   for (let index = 0; index < LAND_COLLECTIONS_TO_DEPLOY; index++) {
-  //     await expect(stakeLands.addLandCollection(landCollections[index].address))
-  //       .not.to.be.reverted;
-  //   }
+  it("Should let owner add collections after deployment", async function () {
+    for (let index = 0; index < LAND_COLLECTIONS_TO_DEPLOY; index++) {
+      await expect(stakeLands.addLandCollection(landCollections[index].address))
+        .not.to.be.reverted;
+    }
 
-  //   const landCollectionsAvailable = await stakeLands.landCollectionsSize();
-  //   expect(landCollectionsAvailable).to.equal(LAND_COLLECTIONS_TO_DEPLOY - 2);
-  // });
+    const landCollectionsAvailable = await stakeLands.landCollectionsSize();
+    expect(landCollectionsAvailable).to.equal(LAND_COLLECTIONS_TO_DEPLOY);
+  });
 
-  // it("Should let owner remove collections", async function () {
-  //   for (let index = 2; index < LAND_COLLECTIONS_TO_DEPLOY; index++) {
-  //     await expect(
-  //       stakeLands.removeLandCollection(landCollections[index].address)
-  //     ).not.to.be.reverted;
-  //   }
+  it("Should let owner remove collections", async function () {
+    for (let index = 2; index < LAND_COLLECTIONS_TO_DEPLOY; index++) {
+      await expect(
+        stakeLands.removeLandCollection(landCollections[index].address)
+      ).not.to.be.reverted;
+    }
 
-  //   const landCollectionsAvailable = await stakeLands.landCollectionsSize();
-  //   expect(landCollectionsAvailable).to.equal(0);
-  // });
+    const landCollectionsAvailable = await stakeLands.landCollectionsSize();
+    expect(landCollectionsAvailable).to.equal(0);
+  });
 
   it("Should let stakers initiate stake heroes with lands and unstake", async () => {
     // whitelist collections
@@ -204,13 +204,6 @@ describe("Stake Lands", function () {
     }
 
     await expect(stakeLands.unstakeHero(herosOnWallet[0])).not.to.be.reverted;
-
-    // const stakedHero = await stakeLands.stakedHeros(owner.address, 0);
-    // console.log("hero: ", stakedHero, " end of hero");
-    // console.log(
-    //   "hero lands: ",
-    //   await stakeLands.getHeroLands(owner.address, stakedHero.heroId)
-    // );
   });
 
   it("Should let a staker add a land to a hero and remove all but one", async () => {
@@ -230,7 +223,7 @@ describe("Stake Lands", function () {
     const landsForHero = [];
     const collectionsForHero = [];
 
-    for (let collectionIndex = 0; collectionIndex < 6; collectionIndex++) {
+    for (let collectionIndex = 0; collectionIndex < 7; collectionIndex++) {
       collectionsForHero.push(landCollections[collectionIndex].address);
       const ownLands = await landCollections[collectionIndex].walletOfOwner(
         owner.address
@@ -249,7 +242,7 @@ describe("Stake Lands", function () {
     const additionalLandsForHero = [];
     const additionalCollectionsForHero = [];
 
-    for (let collectionIndex = 6; collectionIndex < 8; collectionIndex++) {
+    for (let collectionIndex = 7; collectionIndex < 8; collectionIndex++) {
       additionalCollectionsForHero.push(
         landCollections[collectionIndex].address
       );
@@ -285,10 +278,7 @@ describe("Stake Lands", function () {
     // should allow to remove 7 lands
     for (let collectionIndex = 0; collectionIndex < 7; collectionIndex++) {
       landCollectionsToRemove.push(landCollections[collectionIndex].address);
-      const ownLands = await landCollections[collectionIndex].walletOfOwner(
-        owner.address
-      );
-      landsToRemove.push(ownLands[0]);
+      landsToRemove.push(landsForHero[collectionIndex]);
     }
 
     await expect(
@@ -301,7 +291,7 @@ describe("Stake Lands", function () {
 
     // should not allow to remove all lands
     const eighthCollection = landCollections[7].address;
-    const eighthLands = await landCollections[7].walletOfOwner(owner.address);
+    const eighthLands = [landsForHero[7]];
     await expect(
       stakeLands.removeLandsFromHero(
         herosOnWallet[0],
@@ -309,5 +299,61 @@ describe("Stake Lands", function () {
         [eighthLands[0]]
       )
     ).to.be.revertedWith("a hero must be staked at least with one land");
+  });
+
+  it("Should let a staker swap heros", async () => {
+    // whitelist collections
+    for (let index = 0; index < LAND_COLLECTIONS_TO_DEPLOY; index++) {
+      await expect(stakeLands.addLandCollection(landCollections[index].address))
+        .not.to.be.reverted;
+
+      // approve lands of this collection
+      await landCollections[index].setApprovalForAll(stakeLands.address, true);
+    }
+
+    // Approve for all heros
+    await heros.setApprovalForAll(stakeLands.address, true);
+
+    const herosOnWallet = await heros.walletOfOwner(owner.address);
+    const landsForHero = [];
+    const collectionsForHero = [];
+
+    for (let collectionIndex = 0; collectionIndex < 8; collectionIndex++) {
+      collectionsForHero.push(landCollections[collectionIndex].address);
+      const ownLands = await landCollections[collectionIndex].walletOfOwner(
+        owner.address
+      );
+      landsForHero.push(ownLands[0]);
+    }
+
+    // stake a hero with some lands
+    await expect(
+      stakeLands.stakeHeroWithLands(
+        herosOnWallet[0],
+        landsForHero,
+        collectionsForHero
+      )
+    ).not.to.be.reverted;
+
+    // remove some lands
+    const landsToRemove = [];
+    const landCollectionsToRemove = [];
+
+    for (let collectionIndex = 2; collectionIndex < 4; collectionIndex++) {
+      landCollectionsToRemove.push(landCollections[collectionIndex].address);
+      landsToRemove.push(landsForHero[collectionIndex]);
+    }
+
+    await expect(
+      stakeLands.removeLandsFromHero(
+        herosOnWallet[0],
+        landCollectionsToRemove,
+        landsToRemove
+      )
+    ).not.to.be.reverted;
+
+    // swap hero
+    await expect(stakeLands.swapHero(herosOnWallet[0], herosOnWallet[1])).not.to
+      .be.reverted;
   });
 });
