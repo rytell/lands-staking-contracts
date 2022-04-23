@@ -290,13 +290,11 @@ describe("Stake Lands", function () {
     ).not.to.be.reverted;
 
     // should not allow to remove all lands
-    const eighthCollection = landCollections[7].address;
-    const eighthLands = [landsForHero[7]];
     await expect(
       stakeLands.removeLandsFromHero(
         herosOnWallet[0],
-        [eighthCollection],
-        [eighthLands[0]]
+        additionalCollectionsForHero,
+        additionalLandsForHero
       )
     ).to.be.revertedWith("a hero must be staked at least with one land");
   });
