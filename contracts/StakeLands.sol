@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "hardhat/console.sol";
 
 interface IRytellHero {
@@ -31,6 +32,10 @@ interface IRytellLand {
     ) external;
 }
 
+interface IRytellResource {
+    function mint(address account, uint256 amount) external;
+}
+
 contract StakeLands is Ownable, IERC721Receiver {
     struct HeroStatus {
         bool staked;
@@ -57,6 +62,18 @@ contract StakeLands is Ownable, IERC721Receiver {
 
     mapping(address => HeroStatus[]) public stakedHeros;
     mapping(address => LandStatus[]) public stakedLands;
+
+    address public radi;
+    address public wood;
+    address public wheat;
+    address public stone;
+    address public iron;
+
+    address public radiReserveOwner;
+    address public woodReserveOwner;
+    address public wheatReserveOwner;
+    address public stoneReserveOwner;
+    address public ironReserveOwner;
 
     event ReceivedERC721(
         address operator,
@@ -685,5 +702,23 @@ contract StakeLands is Ownable, IERC721Receiver {
         unstakeHero(targetHero);
         acquireHeroOwnership(newHero);
         _setHeroStaked(newHero, block.timestamp);
+    }
+
+    function mintResources(
+        address resource,
+        uint256 amount,
+        address to
+    ) public onlyOwner {
+        if (resource == radi) {
+            IERC20(radi).transferFrom(radiReserveOwner, to, amount);
+        } else if (resource == wood) {
+            IRytellResource(wood).mint(to, amount);
+        } else if (resource == wheat) {
+            IRytellResource(wheat).mint(to, amount);
+        } else if (resource == stone) {
+            IRytellResource(stone).mint(to, amount);
+        } else if (resource == iron) {
+            IRytellResource(iron).mint(to, amount);
+        }
     }
 }
