@@ -70,10 +70,7 @@ contract StakeLands is Ownable, IERC721Receiver {
     address public iron;
 
     address public radiReserveOwner;
-    address public woodReserveOwner;
-    address public wheatReserveOwner;
-    address public stoneReserveOwner;
-    address public ironReserveOwner;
+    address public resourceRecipientWallet;
 
     event ReceivedERC721(
         address operator,
@@ -126,6 +123,7 @@ contract StakeLands is Ownable, IERC721Receiver {
 
     constructor(address _heroContract) {
         heroContract = _heroContract;
+        radiReserveOwner = msg.sender;
     }
 
     function onERC721Received(
@@ -346,7 +344,7 @@ contract StakeLands is Ownable, IERC721Receiver {
                 (
                     uint256[] memory heroLands,
                     address[] memory heroCollections,
-                    bool[] memory stakedStatus
+                    bool[] memory stakedStatus,
                 ) = getHeroLands(msg.sender, heroNumber);
                 for (
                     uint256 landIndex = 0;
@@ -375,11 +373,13 @@ contract StakeLands is Ownable, IERC721Receiver {
         returns (
             uint256[] memory,
             address[] memory,
-            bool[] memory
+            bool[] memory,
+            uint256[] memory
         )
     {
         LandStatus[] storage ownerLands = stakedLands[owner];
         uint256[] memory lands = new uint256[](ownerLands.length);
+        uint256[] memory levels = new uint256[](ownerLands.length);
         address[] memory collections = new address[](ownerLands.length);
         bool[] memory stakedStatus = new bool[](ownerLands.length);
 
@@ -388,10 +388,11 @@ contract StakeLands is Ownable, IERC721Receiver {
                 lands[index] = ownerLands[index].landId;
                 collections[index] = ownerLands[index].collection;
                 stakedStatus[index] = ownerLands[index].staked;
+                levels[index] = ownerLands[index].level;
             }
         }
 
-        return (lands, collections, stakedStatus);
+        return (lands, collections, stakedStatus, levels);
     }
 
     function _setHeroStaked(uint256 hero, uint256 time) internal {
@@ -586,7 +587,7 @@ contract StakeLands is Ownable, IERC721Receiver {
         (
             uint256[] memory heroLands,
             ,
-            bool[] memory stakedStatus
+            bool[] memory stakedStatus,
         ) = getHeroLands(msg.sender, hero);
         for (uint256 index = 0; index < heroLands.length; index++) {
             if (stakedStatus[index]) {
@@ -641,7 +642,7 @@ contract StakeLands is Ownable, IERC721Receiver {
         (
             uint256[] memory heroLands,
             address[] memory heroCollections,
-            bool[] memory stakedStatus
+            bool[] memory stakedStatus,
         ) = getHeroLands(msg.sender, hero);
         for (uint256 index = 0; index < heroLands.length; index++) {
             if (stakedStatus[index]) {
@@ -705,20 +706,163 @@ contract StakeLands is Ownable, IERC721Receiver {
     }
 
     function mintResources(
-        address resource,
-        uint256 amount,
+        address[] memory resources,
+        uint256[] memory amounts,
         address to
     ) public onlyOwner {
-        if (resource == radi) {
-            IERC20(radi).transferFrom(radiReserveOwner, to, amount);
-        } else if (resource == wood) {
-            IRytellResource(wood).mint(to, amount);
-        } else if (resource == wheat) {
-            IRytellResource(wheat).mint(to, amount);
-        } else if (resource == stone) {
-            IRytellResource(stone).mint(to, amount);
-        } else if (resource == iron) {
-            IRytellResource(iron).mint(to, amount);
+        // TODO: add restrictions
+        for (uint256 index = 0; index < resources.length; index++) {
+            if (resources[index] == radi) {
+                IERC20(radi).transferFrom(radiReserveOwner, to, amounts[index]);
+            } else if (resources[index] == wood) {
+                IRytellResource(wood).mint(to, amounts[index]);
+            } else if (resources[index] == wheat) {
+                IRytellResource(wheat).mint(to, amounts[index]);
+            } else if (resources[index] == stone) {
+                IRytellResource(stone).mint(to, amounts[index]);
+            } else if (resources[index] == iron) {
+                IRytellResource(iron).mint(to, amounts[index]);
+            }
+        }
+    }
+
+    function setResource(string memory name, address _address)
+        public
+        onlyOwner
+    {
+        if (
+            keccak256(abi.encodePacked(name)) ==
+            keccak256(abi.encodePacked("radi"))
+        ) {
+            radi = _address;
+        } else if (
+            keccak256(abi.encodePacked(name)) ==
+            keccak256(abi.encodePacked("wood"))
+        ) {
+            wood = _address;
+        } else if (
+            keccak256(abi.encodePacked(name)) ==
+            keccak256(abi.encodePacked("wheat"))
+        ) {
+            wheat = _address;
+        } else if (
+            keccak256(abi.encodePacked(name)) ==
+            keccak256(abi.encodePacked("stone"))
+        ) {
+            stone = _address;
+        } else if (
+            keccak256(abi.encodePacked(name)) ==
+            keccak256(abi.encodePacked("iron"))
+        ) {
+            iron = _address;
+        }
+    }
+
+    function setRadiReserveOwner(address reserveOwner) public onlyOwner {
+        radiReserveOwner = reserveOwner;
+    }
+
+    function setResourceRecipientWallet(address _resourceRecipient)
+        public
+        onlyOwner
+    {
+        resourceRecipientWallet = _resourceRecipient;
+    }
+
+    function _receiveTokens(
+        address[] memory resourcesToReceive,
+        uint256[] memory amounts,
+        address from
+    ) internal {
+        require(
+            resourcesToReceive.length == amounts.length,
+            "Resources quantity and amounts must match"
+        );
+        for (uint256 index = 0; index < amounts.length; index++) {
+            if (resourcesToReceive[index] == radi) {
+                IERC20(radi).transferFrom(
+                    from,
+                    resourceRecipientWallet,
+                    amounts[index]
+                );
+            } else if (resourcesToReceive[index] == wood) {
+                IERC20(wood).transferFrom(
+                    from,
+                    resourceRecipientWallet,
+                    amounts[index]
+                );
+            } else if (resourcesToReceive[index] == wheat) {
+                IERC20(wheat).transferFrom(
+                    from,
+                    resourceRecipientWallet,
+                    amounts[index]
+                );
+            } else if (resourcesToReceive[index] == stone) {
+                IERC20(stone).transferFrom(
+                    from,
+                    resourceRecipientWallet,
+                    amounts[index]
+                );
+            } else if (resourcesToReceive[index] == iron) {
+                IERC20(iron).transferFrom(
+                    from,
+                    resourceRecipientWallet,
+                    amounts[index]
+                );
+            }
+        }
+    }
+
+    function levelHeroLandsUp(
+        address[] memory resourcesToReceive,
+        uint256[] memory amounts,
+        uint256 hero,
+        address whoPays,
+        address heroOwner
+    ) public onlyOwner {
+        require(contractOwnsHero(hero), "Hero must be staked");
+        _receiveTokens(resourcesToReceive, amounts, whoPays);
+
+        LandStatus[] storage accountLands = stakedLands[heroOwner];
+        for (uint256 index = 0; index < accountLands.length; index++) {
+            if (
+                accountLands[index].heroId == hero && accountLands[index].staked
+            ) {
+                ++accountLands[index].level;
+            }
+        }
+    }
+
+    function levelLandsUp(
+        address[] memory resourcesToReceive,
+        uint256[] memory amounts,
+        address[] memory collections,
+        uint256[] memory lands,
+        address whoPays,
+        address landsOwner
+    ) public onlyOwner {
+        _receiveTokens(resourcesToReceive, amounts, whoPays);
+        LandStatus[] storage accountLands = stakedLands[landsOwner];
+        for (
+            uint256 collectionIndex = 0;
+            collectionIndex < collections.length;
+            collectionIndex++
+        ) {
+            for (
+                uint256 accountLandIndex = 0;
+                accountLandIndex < accountLands.length;
+                accountLandIndex++
+            ) {
+                if (
+                    accountLands[accountLandIndex].landId ==
+                    lands[collectionIndex] &&
+                    accountLands[accountLandIndex].collection ==
+                    collections[collectionIndex] &&
+                    accountLands[accountLandIndex].staked
+                ) {
+                    ++accountLands[accountLandIndex].level;
+                }
+            }
         }
     }
 }

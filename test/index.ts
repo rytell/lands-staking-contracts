@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { Contract } from "ethers";
+import { BigNumber, Contract } from "ethers";
 
 describe("Stake Lands", function () {
   let owner: SignerWithAddress;
@@ -9,6 +9,12 @@ describe("Stake Lands", function () {
   const landCollections: Contract[] = [];
   const LAND_COLLECTIONS_TO_DEPLOY = 18; // 17 mintable lands + 2 claimable lands
   let stakeLands: Contract;
+
+  let wood: Contract;
+  let wheat: Contract;
+  let stone: Contract;
+  let iron: Contract;
+
   let heros: Contract;
 
   let testWavax: any;
@@ -140,6 +146,30 @@ describe("Stake Lands", function () {
     // @ts-ignore
     stakeLands = await StakeLands.deploy(heros.address);
     await stakeLands.deployed();
+    await stakeLands.setResource("radi", testRadi.address);
+
+    const Resource = await ethers.getContractFactory("Resource");
+
+    wood = await Resource.deploy(owner.address, "Rytell Wooden Plank", "RWPLK");
+    await wood.deployed();
+    await wood.addManager(stakeLands.address);
+    await stakeLands.setResource("wood", wood.address);
+
+    wheat = await Resource.deploy(owner.address, "Rytell Wheat", "RWHT");
+    await wheat.deployed();
+    await wheat.addManager(stakeLands.address);
+    await stakeLands.setResource("wheat", wheat.address);
+
+    stone = await Resource.deploy(owner.address, "Rytell Stone Block", "RSBLK");
+    await stone.deployed();
+    await stone.addManager(stakeLands.address);
+    await stakeLands.setResource("stone", stone.address);
+
+    iron = await Resource.deploy(owner.address, "Rytell Iron Ore", "RIORE");
+    await iron.deployed();
+    await iron.addManager(stakeLands.address);
+    await stakeLands.setResource("iron", iron.address);
+    await stakeLands.setResourceRecipientWallet(owner.address);
   });
 
   it("Should compile", async function () {
@@ -353,5 +383,162 @@ describe("Stake Lands", function () {
     // swap hero
     await expect(stakeLands.swapHero(herosOnWallet[0], herosOnWallet[1])).not.to
       .be.reverted;
+  });
+
+  it("Should let contract manager mint resources to an account", async () => {
+    // let stakers[0] (account) have some resources
+    await testRadi.approve(stakeLands.address, ethers.constants.MaxUint256);
+
+    await expect(
+      stakeLands.mintResources(
+        [
+          wood.address,
+          stone.address,
+          iron.address,
+          wheat.address,
+          testRadi.address,
+        ],
+        [1000, 1000, 1000, 1000, 1000],
+        stakers[0].address
+      )
+    ).not.to.be.reverted;
+    expect(await wood.balanceOf(stakers[0].address)).to.equal(1000);
+    expect(await stone.balanceOf(stakers[0].address)).to.equal(1000);
+    expect(await iron.balanceOf(stakers[0].address)).to.equal(1000);
+    expect(await wheat.balanceOf(stakers[0].address)).to.equal(1000);
+    expect(await testRadi.balanceOf(stakers[0].address)).to.equal(1000);
+  });
+
+  it("Should let contract manager level a hero lands up", async () => {
+    // from owner to stakers[0]
+    await avaxRadi.transfer(stakers[0].address, "200000000000000000000");
+
+    // stakers[0] mints 8 lands of each collection
+    for (let index = 0; index < LAND_COLLECTIONS_TO_DEPLOY; index++) {
+      await avaxRadi
+        .connect(stakers[0])
+        .approve(landCollections[index].address, ethers.constants.MaxUint256);
+      await landCollections[index].connect(stakers[0]).mint(8);
+
+      // whitelist collection
+      await expect(stakeLands.addLandCollection(landCollections[index].address))
+        .not.to.be.reverted;
+
+      // approve lands of this collection
+      await landCollections[index]
+        .connect(stakers[0])
+        .setApprovalForAll(stakeLands.address, true);
+    }
+
+    // stakers[0] mints 5 heros
+    await heros
+      .connect(stakers[0])
+      .mint(5, { value: ethers.utils.parseEther("12.5") });
+
+    // stakers[0] stakes a hero with some lands
+    const herosOfStaker = await heros.walletOfOwner(stakers[0].address);
+
+    const landsToStake = [];
+    const collectionsToStake = [];
+    for (let index = 0; index < 8; index++) {
+      collectionsToStake.push(landCollections[index].address);
+      const stakerLandsOfCollection = await landCollections[
+        index
+      ].walletOfOwner(stakers[0].address);
+      landsToStake.push(stakerLandsOfCollection[0]);
+    }
+
+    // Approve for all heros
+    await heros.connect(stakers[0]).setApprovalForAll(stakeLands.address, true);
+
+    // stake a hero with some lands
+    await expect(
+      stakeLands
+        .connect(stakers[0])
+        .stakeHeroWithLands(herosOfStaker[0], landsToStake, collectionsToStake)
+    ).not.to.be.reverted;
+
+    // let stakers[0] (account) have some resources
+    await testRadi.approve(stakeLands.address, ethers.constants.MaxUint256);
+
+    await expect(
+      stakeLands.mintResources(
+        [
+          wood.address,
+          stone.address,
+          iron.address,
+          wheat.address,
+          testRadi.address,
+        ],
+        [1000, 1000, 1000, 1000, 1000],
+        stakers[0].address
+      )
+    ).not.to.be.reverted;
+    expect(await wood.balanceOf(stakers[0].address)).to.equal(1000);
+    expect(await stone.balanceOf(stakers[0].address)).to.equal(1000);
+    expect(await iron.balanceOf(stakers[0].address)).to.equal(1000);
+    expect(await wheat.balanceOf(stakers[0].address)).to.equal(1000);
+    expect(await testRadi.balanceOf(stakers[0].address)).to.equal(1000);
+
+    await wood
+      .connect(stakers[0])
+      .approve(stakeLands.address, ethers.constants.MaxUint256);
+    await wheat
+      .connect(stakers[0])
+      .approve(stakeLands.address, ethers.constants.MaxUint256);
+    await stone
+      .connect(stakers[0])
+      .approve(stakeLands.address, ethers.constants.MaxUint256);
+    await iron
+      .connect(stakers[0])
+      .approve(stakeLands.address, ethers.constants.MaxUint256);
+    await testRadi
+      .connect(stakers[0])
+      .approve(stakeLands.address, ethers.constants.MaxUint256);
+
+    // level staker hero lands up (onlyOwner)
+    await expect(
+      stakeLands.levelHeroLandsUp(
+        [
+          wood.address,
+          stone.address,
+          iron.address,
+          wheat.address,
+          testRadi.address,
+        ],
+        [10, 10, 10, 10, 10],
+        herosOfStaker[0],
+        stakers[0].address,
+        stakers[0].address
+      )
+    ).not.to.be.reverted;
+
+    // level some lands up (onlyOwner)
+    await expect(
+      stakeLands.levelLandsUp(
+        [
+          wood.address,
+          stone.address,
+          iron.address,
+          wheat.address,
+          testRadi.address,
+        ],
+        [10, 10, 10, 10, 10],
+        collectionsToStake,
+        landsToStake,
+        stakers[0].address,
+        stakers[0].address
+      )
+    ).not.to.be.reverted;
+
+    const heroLands = await stakeLands.getHeroLands(
+      stakers[0].address,
+      herosOfStaker[0]
+    );
+
+    const [lands, collections, stakeds, levels] = heroLands;
+    expect(levels.every((item: BigNumber) => item.toNumber() === 3)).to.equal(
+      true
+    );
   });
 });
