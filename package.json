@@ -34,7 +34,9 @@
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.5.0",
+    "@poanet/solidity-flattener": "^3.0.7",
     "@rytell/exchange-contracts": "^1.0.1",
+    "@rytell/sdk": "^1.0.4",
     "hardhat-contract-sizer": "^2.5.1",
     "hardhat-tracer": "^1.1.0-rc.3"
   }

@@ -58,7 +58,7 @@ contract StakeLands is Ownable, IERC721Receiver {
 
     address[] public landCollections;
     address public heroContract;
-    uint256 public MAX_LANDS_PER_HERO = 8;
+    uint256 public MAX_LANDS_PER_HERO = 5;
 
     mapping(address => HeroStatus[]) public stakedHeros;
     mapping(address => LandStatus[]) public stakedLands;
@@ -596,7 +596,7 @@ contract StakeLands is Ownable, IERC721Receiver {
         }
 
         require(
-            landsCount + lands.length <= 8,
+            landsCount + lands.length <= MAX_LANDS_PER_HERO,
             "MAX_LANDS_PER_HERO exceeded with additional lands"
         );
         uint256 time = block.timestamp;
@@ -828,6 +828,7 @@ contract StakeLands is Ownable, IERC721Receiver {
             if (
                 accountLands[index].heroId == hero && accountLands[index].staked
             ) {
+                require(accountLands[index].level < 50, "MAX LEVEL FOR LAND ALREADY ACHIEVED");
                 ++accountLands[index].level;
             }
         }
@@ -860,6 +861,7 @@ contract StakeLands is Ownable, IERC721Receiver {
                     collections[collectionIndex] &&
                     accountLands[accountLandIndex].staked
                 ) {
+                    require(accountLands[accountLandIndex].level < 50, "MAX LEVEL FOR LAND ALREADY ACHIEVED");
                     ++accountLands[accountLandIndex].level;
                 }
             }
