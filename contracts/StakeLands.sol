@@ -542,14 +542,13 @@ contract StakeLands is Ownable, IERC721Receiver {
                 landsOfAccount[index].landId == landNumber &&
                 landsOfAccount[index].collection == collection
             ) {
-                landsOfAccount[index].lastUnstaked = time;
-                landsOfAccount[index].staked = false;
-                landsOfAccount[index].heroId = 0;
                 IRytellLand(collection).safeTransferFrom(
                     address(this),
                     msg.sender,
                     landNumber
                 );
+                landsOfAccount[index].lastUnstaked = time;
+                landsOfAccount[index].staked = false;
                 emit UnstakedLand(
                     false,
                     landNumber,
