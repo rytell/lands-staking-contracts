@@ -54,6 +54,7 @@ contract StakeLands is Ownable, IERC721Receiver {
         address owner;
         uint256 lastStaked;
         uint256 lastUnstaked;
+        uint256 lastLeveledUp;
     }
 
     address[] public landCollections;
@@ -119,6 +120,13 @@ contract StakeLands is Ownable, IERC721Receiver {
         uint256 oldeHero,
         uint256 newHero,
         uint256 when
+    );
+    event LeveledLandUp(
+        uint256 hero,
+        uint256 landId,
+        address collection,
+        address owner,
+        uint256 level
     );
 
     constructor(address _heroContract) {
@@ -345,6 +353,7 @@ contract StakeLands is Ownable, IERC721Receiver {
                     uint256[] memory heroLands,
                     address[] memory heroCollections,
                     bool[] memory stakedStatus,
+
                 ) = getHeroLands(msg.sender, heroNumber);
                 for (
                     uint256 landIndex = 0;
@@ -486,7 +495,8 @@ contract StakeLands is Ownable, IERC721Receiver {
                         owner: msg.sender,
                         landId: land,
                         collection: collection,
-                        level: 1
+                        level: 1,
+                        lastLeveledUp: 0
                     })
                 );
                 emit StakedLand(
@@ -510,7 +520,8 @@ contract StakeLands is Ownable, IERC721Receiver {
                     owner: msg.sender,
                     landId: land,
                     collection: collection,
-                    level: 1
+                    level: 1,
+                    lastLeveledUp: 0
                 })
             );
             emit StakedLand(
@@ -587,6 +598,7 @@ contract StakeLands is Ownable, IERC721Receiver {
             uint256[] memory heroLands,
             ,
             bool[] memory stakedStatus,
+
         ) = getHeroLands(msg.sender, hero);
         for (uint256 index = 0; index < heroLands.length; index++) {
             if (stakedStatus[index]) {
@@ -642,6 +654,7 @@ contract StakeLands is Ownable, IERC721Receiver {
             uint256[] memory heroLands,
             address[] memory heroCollections,
             bool[] memory stakedStatus,
+
         ) = getHeroLands(msg.sender, hero);
         for (uint256 index = 0; index < heroLands.length; index++) {
             if (stakedStatus[index]) {
@@ -827,8 +840,19 @@ contract StakeLands is Ownable, IERC721Receiver {
             if (
                 accountLands[index].heroId == hero && accountLands[index].staked
             ) {
-                require(accountLands[index].level < 50, "MAX LEVEL FOR LAND ALREADY ACHIEVED");
+                require(
+                    accountLands[index].level < 50,
+                    "MAX LEVEL FOR LAND ALREADY ACHIEVED"
+                );
                 ++accountLands[index].level;
+                accountLands[index].lastLeveledUp = block.timestamp;
+                emit LeveledLandUp(
+                    accountLands[index].heroId,
+                    accountLands[index].landId,
+                    accountLands[index].collection,
+                    accountLands[index].owner,
+                    accountLands[index].level
+                );
             }
         }
     }
@@ -860,8 +884,20 @@ contract StakeLands is Ownable, IERC721Receiver {
                     collections[collectionIndex] &&
                     accountLands[accountLandIndex].staked
                 ) {
-                    require(accountLands[accountLandIndex].level < 50, "MAX LEVEL FOR LAND ALREADY ACHIEVED");
+                    require(
+                        accountLands[accountLandIndex].level < 50,
+                        "MAX LEVEL FOR LAND ALREADY ACHIEVED"
+                    );
                     ++accountLands[accountLandIndex].level;
+                    accountLands[accountLandIndex].lastLeveledUp = block
+                        .timestamp;
+                    emit LeveledLandUp(
+                        accountLands[accountLandIndex].heroId,
+                        accountLands[accountLandIndex].landId,
+                        accountLands[accountLandIndex].collection,
+                        accountLands[accountLandIndex].owner,
+                        accountLands[accountLandIndex].level
+                    );
                 }
             }
         }

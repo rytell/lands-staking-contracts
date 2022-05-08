@@ -4,7 +4,7 @@ import { ChainId, Token } from "@rytell/sdk";
 
 // eslint-disable-next-line no-unused-vars
 const STAKE_LANDS: { [chainId in ChainId]: string } = {
-  [ChainId.FUJI]: "0x1C318d19A098202858B44B200c63033d47B92206",
+  [ChainId.FUJI]: "0x733ecAa6611513BfaDf03E1E156Cf7D991c281F0",
   [ChainId.AVALANCHE]: "0x0000000000000000000000000000000000000000",
 };
 
