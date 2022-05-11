@@ -470,6 +470,7 @@ contract StakeLands is Ownable, IERC721Receiver {
                     landsOfAccount[index].lastStaked = time;
                     landsOfAccount[index].staked = true;
                     landsOfAccount[index].owner = msg.sender;
+                    landsOfAccount[index].heroId = hero;
                     foundLand = true;
                     emit StakedLand(
                         true,
