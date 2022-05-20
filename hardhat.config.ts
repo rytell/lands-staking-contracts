@@ -9,6 +9,7 @@ import "ts-node/register";
 import dotenv from "dotenv";
 dotenv.config();
 const privateKey = process.env.PRIVATE_KEY || "";
+const gameEmissionsKey = process.env.GAME_EMISSIONS_PK || "";
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -77,6 +78,20 @@ const config: HardhatUserConfig = {
           },
         },
       },
+      {
+        version: "0.8.14",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 400,
+          },
+          outputSelection: {
+            "*": {
+              "*": ["storageLayout"],
+            },
+          },
+        },
+      },
     ],
   },
   networks: {
@@ -111,13 +126,13 @@ const config: HardhatUserConfig = {
       gas: 8000000,
       gasPrice: 25000000000,
       chainId: 43113,
-      accounts: [privateKey],
+      accounts: [privateKey, gameEmissionsKey],
     },
     mainnet: {
       url: "https://api.avax.network/ext/bc/C/rpc",
       gasPrice: 42000000000,
       chainId: 43114,
-      accounts: [privateKey],
+      accounts: [privateKey, gameEmissionsKey],
     },
   },
   gasReporter: {

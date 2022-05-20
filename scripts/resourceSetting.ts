@@ -4,7 +4,7 @@ import { ChainId, Token } from "@rytell/sdk";
 
 // eslint-disable-next-line no-unused-vars
 const STAKE_LANDS: { [chainId in ChainId]: string } = {
-  [ChainId.FUJI]: "0x733ecAa6611513BfaDf03E1E156Cf7D991c281F0",
+  [ChainId.FUJI]: "0xA49117a4815fb484934B1A9Dbbb9F839515E79f4", // v3
   [ChainId.AVALANCHE]: "0x0000000000000000000000000000000000000000",
 };
 
@@ -98,33 +98,72 @@ export const GAME_EMISSIONS_FUND = {
 };
 
 async function main() {
+  const [deployer, gameEmissionsFund] = await ethers.getSigners();
+
   const StakeLands = await ethers.getContractFactory("StakeLands");
   const stakeLands = StakeLands.attach(STAKE_LANDS[currentChain]);
 
-  await stakeLands.setResource("radi", RADI[ChainId.FUJI].address);
+  // await stakeLands.setResource("radi", RADI[currentChain].address);
 
   const Resource = await ethers.getContractFactory("Resource");
 
   const wood = Resource.attach(WOOD[currentChain].address);
-  await wood.addManager(stakeLands.address);
-  await stakeLands.setResource("wood", wood.address);
+  // await wood.connect(gameEmissionsFund).addManager(stakeLands.address);
+  // await stakeLands.setResource("wood", wood.address);
 
   const wheat = Resource.attach(WHEAT[currentChain].address);
-  await wheat.addManager(stakeLands.address);
-  await stakeLands.setResource("wheat", wheat.address);
+  // await wheat.connect(gameEmissionsFund).addManager(stakeLands.address);
+  // await stakeLands.setResource("wheat", wheat.address);
 
   const stone = Resource.attach(STONE[currentChain].address);
-  await stone.addManager(stakeLands.address);
-  await stakeLands.setResource("stone", stone.address);
+  // await stone.connect(gameEmissionsFund).addManager(stakeLands.address);
+  // await stakeLands.setResource("stone", stone.address);
 
   const iron = Resource.attach(IRON[currentChain].address);
-  await iron.addManager(stakeLands.address);
-  await stakeLands.setResource("iron", iron.address);
+  // await iron.connect(gameEmissionsFund).addManager(stakeLands.address);
+  // await stakeLands.setResource("iron", iron.address);
 
-  await stakeLands.setResourceRecipientWallet(
-    GAME_EMISSIONS_FUND[currentChain]
-  );
-  await stakeLands.setRadiReserveOwner(GAME_EMISSIONS_FUND[currentChain]);
+  // await stakeLands.setResourceRecipientWallet(
+  //   GAME_EMISSIONS_FUND[currentChain]
+  // );
+  // await stakeLands.setRadiReserveOwner(GAME_EMISSIONS_FUND[currentChain]);
+
+  const Radi = await ethers.getContractFactory("Radi");
+  const radi = await Radi.attach(RADI[currentChain].address);
+
+  // allowances for level up
+  // await wood
+  //   .connect(deployer)
+  //   .approve(stakeLands.address, ethers.constants.MaxUint256);
+  // await wheat
+  //   .connect(deployer)
+  //   .approve(stakeLands.address, ethers.constants.MaxUint256);
+  // await iron
+  //   .connect(deployer)
+  //   .approve(stakeLands.address, ethers.constants.MaxUint256);
+  // await stone
+  //   .connect(deployer)
+  //   .approve(stakeLands.address, ethers.constants.MaxUint256);
+  await radi
+    .connect(deployer)
+    .approve(stakeLands.address, ethers.constants.MaxUint256);
+
+  // allowances for resource harvesting
+  // await wood
+  //   .connect(gameEmissionsFund)
+  //   .approve(stakeLands.address, ethers.constants.MaxUint256);
+  // await wheat
+  //   .connect(gameEmissionsFund)
+  //   .approve(stakeLands.address, ethers.constants.MaxUint256);
+  // await iron
+  //   .connect(gameEmissionsFund)
+  //   .approve(stakeLands.address, ethers.constants.MaxUint256);
+  // await stone
+  //   .connect(gameEmissionsFund)
+  //   .approve(stakeLands.address, ethers.constants.MaxUint256);
+  await radi
+    .connect(gameEmissionsFund)
+    .approve(stakeLands.address, ethers.constants.MaxUint256);
 }
 
 main().catch((error) => {

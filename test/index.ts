@@ -9,6 +9,8 @@ describe("Stake Lands", function () {
   const landCollections: Contract[] = [];
   const LAND_COLLECTIONS_TO_DEPLOY = 18; // 17 mintable lands + 2 claimable lands
   let stakeLands: Contract;
+  let stakeLandsV1: Contract;
+  let stakeLandsV2: Contract;
 
   let wood: Contract;
   let wheat: Contract;
@@ -56,7 +58,6 @@ describe("Stake Lands", function () {
     router = await RytellRouter.deploy(factory.address, testWavax.address);
     await router.deployed();
 
-    // TODO approve router to take all injector account tokens
     await testWavax.approve(router.address, ethers.constants.MaxUint256);
     await testUsdc.approve(router.address, ethers.constants.MaxUint256);
     await testRadi.approve(router.address, ethers.constants.MaxUint256);
@@ -153,31 +154,65 @@ describe("Stake Lands", function () {
     wood = await Resource.deploy(owner.address, "Rytell Wooden Plank", "RWPLK");
     await wood.deployed();
     await wood.addManager(stakeLands.address);
+
     await stakeLands.setResource("wood", wood.address);
 
     wheat = await Resource.deploy(owner.address, "Rytell Wheat", "RWHT");
     await wheat.deployed();
     await wheat.addManager(stakeLands.address);
+
     await stakeLands.setResource("wheat", wheat.address);
 
     stone = await Resource.deploy(owner.address, "Rytell Stone Block", "RSBLK");
     await stone.deployed();
     await stone.addManager(stakeLands.address);
+
     await stakeLands.setResource("stone", stone.address);
 
     iron = await Resource.deploy(owner.address, "Rytell Iron Ore", "RIORE");
     await iron.deployed();
     await iron.addManager(stakeLands.address);
+
     await stakeLands.setResource("iron", iron.address);
     await stakeLands.setResourceRecipientWallet(owner.address);
+
+    // @ts-ignore
+    stakeLandsV1 = await StakeLands.deploy(heros.address);
+    await stakeLandsV1.deployed();
+    await stakeLandsV1.setResource("radi", testRadi.address);
+    await stakeLandsV1.setResource("wood", wood.address);
+    await stakeLandsV1.setResource("wheat", wheat.address);
+    await stakeLandsV1.setResource("stone", stone.address);
+    await stakeLandsV1.setResourceRecipientWallet(owner.address);
+
+    // @ts-ignore
+    stakeLandsV2 = await StakeLands.deploy(heros.address);
+    await stakeLandsV2.deployed();
+    await stakeLandsV2.setResource("radi", testRadi.address);
+    await stakeLandsV2.setResource("wood", wood.address);
+    await stakeLandsV2.setResource("wheat", wheat.address);
+    await stakeLandsV2.setResource("stone", stone.address);
+    await stakeLandsV2.setResourceRecipientWallet(owner.address);
+
+    await wood.addManager(stakeLandsV1.address);
+    await wood.addManager(stakeLandsV2.address);
+    await wheat.addManager(stakeLandsV1.address);
+    await wheat.addManager(stakeLandsV2.address);
+    await stone.addManager(stakeLandsV1.address);
+    await stone.addManager(stakeLandsV2.address);
+    await iron.addManager(stakeLandsV1.address);
+    await iron.addManager(stakeLandsV2.address);
+
+    await stakeLands.setV1(stakeLandsV1.address);
+    await stakeLands.setV2(stakeLandsV2.address);
   });
 
-  it("Should compile", async function () {
-    console.log("landCollections: ", landCollections.length);
-    console.log("stakers: ", stakers.length);
-    console.log("stake lands contract: ", stakeLands.address);
-    expect(true).to.equal(true);
-  });
+  // it("Should compile", async function () {
+  //   console.log("landCollections: ", landCollections.length);
+  //   console.log("stakers: ", stakers.length);
+  //   console.log("stake lands contract: ", stakeLands.address);
+  //   expect(true).to.equal(true);
+  // });
 
   it("Should let owner add collections after deployment", async function () {
     for (let index = 0; index < LAND_COLLECTIONS_TO_DEPLOY; index++) {
@@ -758,5 +793,122 @@ describe("Stake Lands", function () {
     expect(firstLandOfStaker.lastLeveledUp.toNumber() * 1000).to.be.greaterThan(
       new Date().getTime()
     );
+  });
+
+  it("Should let users of v1 and v2 migrate their heros accordingly", async () => {
+    // whitelist collections
+    for (let index = 0; index < LAND_COLLECTIONS_TO_DEPLOY; index++) {
+      await expect(
+        stakeLandsV1.addLandCollection(landCollections[index].address)
+      ).not.to.be.reverted;
+      // approve lands of this collection
+      await landCollections[index].setApprovalForAll(
+        stakeLandsV1.address,
+        true
+      );
+
+      await expect(
+        stakeLandsV2.addLandCollection(landCollections[index].address)
+      ).not.to.be.reverted;
+      // approve lands of this collection
+      await landCollections[index].setApprovalForAll(
+        stakeLandsV2.address,
+        true
+      );
+    }
+    // Approve for all heros
+    await heros.setApprovalForAll(stakeLandsV1.address, true);
+    await heros.setApprovalForAll(stakeLandsV2.address, true);
+
+    const herosOnWallet = await heros.walletOfOwner(owner.address);
+
+    // v1
+    const landsForHero = [];
+    const collectionsForHero = [];
+    for (let collectionIndex = 0; collectionIndex < 3; collectionIndex++) {
+      collectionsForHero.push(landCollections[collectionIndex].address);
+      const ownLands = await landCollections[collectionIndex].walletOfOwner(
+        owner.address
+      );
+      landsForHero.push(ownLands[0]);
+    }
+
+    // stake a hero with some lands v1
+    await expect(
+      stakeLandsV1.stakeHeroWithLands(
+        herosOnWallet[0],
+        landsForHero,
+        collectionsForHero
+      )
+    ).not.to.be.reverted;
+
+    // level up three times
+    for (let index = 0; index < 3; index++) {
+      await expect(
+        stakeLandsV1.levelHeroLandsUp(
+          [],
+          [],
+          herosOnWallet[0],
+          owner.address,
+          owner.address
+        )
+      ).not.to.be.reverted;
+    }
+
+    // unstake
+    await expect(stakeLandsV1.unstakeHero(herosOnWallet[0])).not.to.be.reverted;
+
+    // stake same hero with some lands v2
+    await expect(
+      stakeLandsV2.stakeHeroWithLands(
+        herosOnWallet[0],
+        landsForHero,
+        collectionsForHero
+      )
+    ).not.to.be.reverted;
+
+    // level up twice
+    for (let index = 0; index < 2; index++) {
+      await expect(
+        stakeLandsV2.levelHeroLandsUp(
+          [],
+          [],
+          herosOnWallet[0],
+          owner.address,
+          owner.address
+        )
+      ).not.to.be.reverted;
+    }
+
+    await expect(stakeLands.migrateFrom(stakeLandsV1.address)).not.to.be
+      .reverted;
+    await expect(stakeLands.migrateFrom(stakeLandsV2.address)).not.to.be
+      .reverted;
+    await expect(
+      stakeLands.connect(stakers[3]).migrateFrom(stakeLandsV2.address)
+    ).not.to.be.reverted;
+
+    await expect(
+      stakeLands.migrateFrom(stakeLandsV1.address)
+    ).to.be.revertedWith("Already migrated v1");
+    await expect(
+      stakeLands.migrateFrom(stakeLandsV2.address)
+    ).to.be.revertedWith("Already migrated v2");
+    await expect(
+      stakeLands.connect(stakers[3]).migrateFrom(stakeLandsV2.address)
+    ).to.be.revertedWith("Already migrated v2");
+
+    // expect all lands to keep max level
+    let landIdx = 0;
+    while (true) {
+      try {
+        expect(
+          (await stakeLands.stakedLands(owner.address, landIdx)).level
+        ).to.equal(3);
+      } catch (error) {
+        break;
+      }
+      landIdx++;
+    }
   });
 });

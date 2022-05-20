@@ -36,6 +36,38 @@ interface IRytellResource {
     function mint(address account, uint256 amount) external;
 }
 
+interface IStakeLands {
+    struct HeroStatus {
+        bool staked;
+        uint256 lastStaked;
+        uint256 lastUnstaked;
+        uint256 heroId;
+        address owner;
+    }
+
+    struct LandStatus {
+        bool staked;
+        uint256 landId;
+        address collection;
+        uint256 level;
+        uint256 heroId;
+        address owner;
+        uint256 lastStaked;
+        uint256 lastUnstaked;
+        uint256 lastLeveledUp;
+    }
+
+    function stakedHeros(address owner, uint256 index)
+        external
+        view
+        returns (HeroStatus memory hero);
+
+    function stakedLands(address owner, uint256 index)
+        external
+        view
+        returns (LandStatus memory land);
+}
+
 contract StakeLands is Ownable, IERC721Receiver {
     struct HeroStatus {
         bool staked;
@@ -72,6 +104,11 @@ contract StakeLands is Ownable, IERC721Receiver {
 
     address public radiReserveOwner;
     address public resourceRecipientWallet;
+
+    address public v1Contract;
+    address public v2Contract;
+    mapping(address => bool) migratedV1;
+    mapping(address => bool) migratedV2;
 
     event ReceivedERC721(
         address operator,
@@ -132,6 +169,14 @@ contract StakeLands is Ownable, IERC721Receiver {
     constructor(address _heroContract) {
         heroContract = _heroContract;
         radiReserveOwner = msg.sender;
+    }
+
+    function setV1(address _v1) public onlyOwner {
+        v1Contract = _v1;
+    }
+
+    function setV2(address _v2) public onlyOwner {
+        v2Contract = _v2;
     }
 
     function onERC721Received(
@@ -476,11 +521,11 @@ contract StakeLands is Ownable, IERC721Receiver {
                         true,
                         land,
                         collection,
-                        1,
+                        landsOfAccount[index].level,
                         hero,
                         msg.sender,
                         time,
-                        0
+                        landsOfAccount[index].lastUnstaked
                     );
                     return;
                 }
@@ -723,7 +768,6 @@ contract StakeLands is Ownable, IERC721Receiver {
         uint256[] memory amounts,
         address to
     ) public onlyOwner {
-        // TODO: add restrictions
         for (uint256 index = 0; index < resources.length; index++) {
             if (resources[index] == radi) {
                 IERC20(radi).transferFrom(radiReserveOwner, to, amounts[index]);
@@ -901,6 +945,135 @@ contract StakeLands is Ownable, IERC721Receiver {
                     );
                 }
             }
+        }
+    }
+
+    function migrateFrom(address stakingLandsContract) public {
+        require(v1Contract != address(0), "v1 not yet configured");
+        require(v2Contract != address(0), "v2 not yet configured");
+
+        require(
+            stakingLandsContract == v1Contract ||
+                stakingLandsContract == v2Contract,
+            "Staking Lands: go away"
+        );
+
+        if (stakingLandsContract == v1Contract) {
+            require(!migratedV1[msg.sender], "Already migrated v1");
+            migratedV1[msg.sender] = true;
+        } else if (stakingLandsContract == v2Contract) {
+            require(!migratedV2[msg.sender], "Already migrated v2");
+            migratedV2[msg.sender] = true;
+        }
+
+        uint256 landIndex = 0;
+        while (true) {
+            try
+                IStakeLands(stakingLandsContract).stakedLands(
+                    msg.sender,
+                    landIndex
+                )
+            {
+                IStakeLands.LandStatus memory landToMigrate = IStakeLands(
+                    stakingLandsContract
+                ).stakedLands(msg.sender, landIndex);
+
+                LandStatus[] storage landsOfAccount = stakedLands[msg.sender];
+                if (landsOfAccount.length > 0) {
+                    bool foundLand = false;
+                    for (
+                        uint256 index = 0;
+                        index < landsOfAccount.length;
+                        index++
+                    ) {
+                        if (
+                            landsOfAccount[index].landId == landToMigrate.landId &&
+                            landsOfAccount[index].collection == landToMigrate.collection
+                        ) {
+                            require(
+                                landsOfAccount[index].staked == false,
+                                "Land is already staked"
+                            );
+                            landsOfAccount[index].lastStaked = landToMigrate.lastStaked;
+                            landsOfAccount[index].staked = landToMigrate.staked;
+                            landsOfAccount[index].owner = landToMigrate.owner;
+                            landsOfAccount[index].heroId = landToMigrate.heroId;
+
+                            // take max land level between versions
+                            if(landsOfAccount[index].level < landToMigrate.level) {
+                                landsOfAccount[index].level = landToMigrate.level;
+                                landsOfAccount[index].lastLeveledUp = landToMigrate.lastLeveledUp;
+                            }
+
+                            foundLand = true;
+                            emit StakedLand(
+                                landsOfAccount[index].staked,
+                                landsOfAccount[index].landId,
+                                landsOfAccount[index].collection,
+                                landsOfAccount[index].level,
+                                landsOfAccount[index].heroId,
+                                landsOfAccount[index].owner,
+                                landsOfAccount[index].lastStaked,
+                                landsOfAccount[index].lastUnstaked
+                            );
+                            return;
+                        }
+                    }
+
+                    if (foundLand == false) {
+                        landsOfAccount.push(
+                            LandStatus({
+                                staked: landToMigrate.staked,
+                                lastStaked: landToMigrate.lastStaked,
+                                lastUnstaked: landToMigrate.lastUnstaked,
+                                heroId: landToMigrate.heroId,
+                                owner: landToMigrate.owner,
+                                landId: landToMigrate.landId,
+                                collection: landToMigrate.collection,
+                                level: landToMigrate.level,
+                                lastLeveledUp: landToMigrate.lastLeveledUp
+                            })
+                        );
+                        emit StakedLand(
+                            landToMigrate.staked,
+                            landToMigrate.landId,
+                            landToMigrate.collection,
+                            landToMigrate.level,
+                            landToMigrate.heroId,
+                            landToMigrate.owner,
+                            landToMigrate.lastStaked,
+                            landToMigrate.lastUnstaked
+                        );
+                    }
+                } else {
+                    landsOfAccount.push(
+                        LandStatus({
+                            staked: landToMigrate.staked,
+                            lastStaked: landToMigrate.lastStaked,
+                            lastUnstaked: landToMigrate.lastUnstaked,
+                            heroId: landToMigrate.heroId,
+                            owner: landToMigrate.owner,
+                            landId: landToMigrate.landId,
+                            collection: landToMigrate.collection,
+                            level: landToMigrate.level,
+                            lastLeveledUp: landToMigrate.lastLeveledUp
+                        })
+                    );
+                    emit StakedLand(
+                        landToMigrate.staked,
+                        landToMigrate.landId,
+                        landToMigrate.collection,
+                        landToMigrate.level,
+                        landToMigrate.heroId,
+                        landToMigrate.owner,
+                        landToMigrate.lastStaked,
+                        landToMigrate.lastUnstaked
+                    );
+                }
+            } catch {
+                break;
+            }
+            landIndex++;
         }
     }
 }
