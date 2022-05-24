@@ -107,8 +107,8 @@ contract StakeLands is Ownable, IERC721Receiver {
 
     address public v1Contract;
     address public v2Contract;
-    mapping(address => bool) migratedV1;
-    mapping(address => bool) migratedV2;
+    mapping(address => bool) public migratedV1;
+    mapping(address => bool) public migratedV2;
 
     event ReceivedERC721(
         address operator,
