@@ -987,22 +987,27 @@ contract StakeLands is Ownable, IERC721Receiver {
                         index++
                     ) {
                         if (
-                            landsOfAccount[index].landId == landToMigrate.landId &&
-                            landsOfAccount[index].collection == landToMigrate.collection
+                            landsOfAccount[index].landId ==
+                            landToMigrate.landId &&
+                            landsOfAccount[index].collection ==
+                            landToMigrate.collection
                         ) {
-                            require(
-                                landsOfAccount[index].staked == false,
-                                "Land is already staked"
-                            );
-                            landsOfAccount[index].lastStaked = landToMigrate.lastStaked;
+                            landsOfAccount[index].lastStaked = landToMigrate
+                                .lastStaked;
                             landsOfAccount[index].staked = landToMigrate.staked;
                             landsOfAccount[index].owner = landToMigrate.owner;
                             landsOfAccount[index].heroId = landToMigrate.heroId;
 
                             // take max land level between versions
-                            if(landsOfAccount[index].level < landToMigrate.level) {
-                                landsOfAccount[index].level = landToMigrate.level;
-                                landsOfAccount[index].lastLeveledUp = landToMigrate.lastLeveledUp;
+                            if (
+                                landsOfAccount[index].level <
+                                landToMigrate.level
+                            ) {
+                                landsOfAccount[index].level = landToMigrate
+                                    .level;
+                                landsOfAccount[index]
+                                    .lastLeveledUp = landToMigrate
+                                    .lastLeveledUp;
                             }
 
                             foundLand = true;
@@ -1074,6 +1079,69 @@ contract StakeLands is Ownable, IERC721Receiver {
                 break;
             }
             landIndex++;
+        }
+
+        uint256 heroIndex = 0;
+        while (true) {
+            try
+                IStakeLands(stakingLandsContract).stakedHeros(
+                    msg.sender,
+                    heroIndex
+                )
+            {
+                IStakeLands.HeroStatus memory heroToMigrate = IStakeLands(
+                    stakingLandsContract
+                ).stakedHeros(msg.sender, heroIndex);
+
+                HeroStatus[] storage heroesOfAccount = stakedHeros[msg.sender];
+                if (heroesOfAccount.length > 0) {
+                    bool foundHero = false;
+                    for (
+                        uint256 index = 0;
+                        index < heroesOfAccount.length;
+                        index++
+                    ) {
+                        if (
+                            heroesOfAccount[index].heroId ==
+                            heroToMigrate.heroId
+                        ) {
+                            heroesOfAccount[index].lastStaked = heroToMigrate
+                                .lastStaked;
+                            heroesOfAccount[index].staked = heroToMigrate
+                                .staked;
+                            heroesOfAccount[index].owner = heroToMigrate.owner;
+
+                            foundHero = true;
+                            return;
+                        }
+                    }
+
+                    if (foundHero == false) {
+                        heroesOfAccount.push(
+                            HeroStatus({
+                                staked: heroToMigrate.staked,
+                                lastStaked: heroToMigrate.lastStaked,
+                                lastUnstaked: heroToMigrate.lastUnstaked,
+                                heroId: heroToMigrate.heroId,
+                                owner: heroToMigrate.owner
+                            })
+                        );
+                    }
+                } else {
+                    heroesOfAccount.push(
+                        HeroStatus({
+                            staked: heroToMigrate.staked,
+                            lastStaked: heroToMigrate.lastStaked,
+                            lastUnstaked: heroToMigrate.lastUnstaked,
+                            heroId: heroToMigrate.heroId,
+                            owner: heroToMigrate.owner
+                        })
+                    );
+                }
+            } catch {
+                break;
+            }
+            heroIndex++;
         }
     }
 }
