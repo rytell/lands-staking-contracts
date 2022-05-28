@@ -18,7 +18,7 @@ const STAKE_LANDS: { [chainId in ChainId]: string } = {
   // [ChainId.FUJI]: "0xA49117a4815fb484934B1A9Dbbb9F839515E79f4", // v3
   // [ChainId.FUJI]: "0xA6184BE7102048F6C27828d77a246652850bb827", // v3 with public migrated fields
   [ChainId.FUJI]: "0x19aE2a813Bc10147a3700101359AdD1579aa9274", // v3 with heros migrated as well with lands
-  [ChainId.AVALANCHE]: "0x0000000000000000000000000000000000000000",
+  [ChainId.AVALANCHE]: "0x25600Cc62b221e05AEfAF8060C3CFd855911cEB6",
 };
 
 const RADI = {
@@ -48,7 +48,7 @@ const WOOD = {
   ),
   [ChainId.AVALANCHE]: new Token(
     ChainId.AVALANCHE,
-    "0x0000000000000000000000000000000000000000",
+    "0x4c0E28fFedBFc761a7be92596ff8c7940188b684",
     18,
     "RWPLK",
     "Rytell Wooden Plank"
@@ -64,7 +64,7 @@ const WHEAT = {
   ),
   [ChainId.AVALANCHE]: new Token(
     ChainId.AVALANCHE,
-    "0x0000000000000000000000000000000000000000",
+    "0xD73d3E047266EaB2309F9929AafE8Fc3e7cEC072",
     18,
     "RWHT",
     "Rytell Wheat"
@@ -80,7 +80,7 @@ const STONE = {
   ),
   [ChainId.AVALANCHE]: new Token(
     ChainId.AVALANCHE,
-    "0x0000000000000000000000000000000000000000",
+    "0xdcA5a32D4528378e5B9a553a2A0bcFc14B9c2D1e",
     18,
     "RSBLK",
     "Rytell Stone Block"
@@ -96,14 +96,14 @@ const IRON = {
   ),
   [ChainId.AVALANCHE]: new Token(
     ChainId.AVALANCHE,
-    "0x0000000000000000000000000000000000000000",
+    "0x3D05755C9Abad73951594D37891982b9c917BDAF",
     18,
     "RIORE",
     "Rytell Iron Ore"
   ),
 };
 
-const currentChain = ChainId.FUJI;
+const currentChain = ChainId.AVALANCHE;
 
 export const GAME_EMISSIONS_FUND = {
   [ChainId.FUJI]: "0x3059bbb4a86a502b7c2a838a4a87baf680887c04",
@@ -121,19 +121,19 @@ async function main() {
   const StakeLands = await ethers.getContractFactory("StakeLands");
   const stakeLands = StakeLands.attach(STAKE_LANDS[currentChain]);
 
-  // const Resource = await ethers.getContractFactory("Resource");
+  const Resource = await ethers.getContractFactory("Resource");
 
-  // const wood = Resource.attach(WOOD[currentChain].address);
-  // await wood.connect(gameEmissionsFund).addManager(stakeLands.address);
+  const wood = Resource.attach(WOOD[currentChain].address);
+  // await wood.connect(deployer).addManager(stakeLands.address);
 
-  // const wheat = Resource.attach(WHEAT[currentChain].address);
-  // await wheat.connect(gameEmissionsFund).addManager(stakeLands.address);
+  const wheat = Resource.attach(WHEAT[currentChain].address);
+  // await wheat.connect(deployer).addManager(stakeLands.address);
 
-  // const stone = Resource.attach(STONE[currentChain].address);
-  // await stone.connect(gameEmissionsFund).addManager(stakeLands.address);
+  const stone = Resource.attach(STONE[currentChain].address);
+  // await stone.connect(deployer).addManager(stakeLands.address);
 
-  // const iron = Resource.attach(IRON[currentChain].address);
-  // await iron.connect(gameEmissionsFund).addManager(stakeLands.address);
+  const iron = Resource.attach(IRON[currentChain].address);
+  // await iron.connect(deployer).addManager(stakeLands.address);
 
   // await stakeLands.setResource("iron", iron.address);
   // await stakeLands.setResource("wood", wood.address);
@@ -147,7 +147,7 @@ async function main() {
   // await stakeLands.setRadiReserveOwner(GAME_EMISSIONS_FUND[currentChain]);
   // await stakeLands.addLandCollection(CLAIM_LAND_HERO_CONTRACT[currentChain]);
 
-  // const Radi = await ethers.getContractFactory("Radi");
+  const Radi = await ethers.getContractFactory("Radi");
   // const radi = await Radi.attach(RADI[currentChain].address);
 
   // allowances for level up
@@ -173,8 +173,8 @@ async function main() {
   //   .approve(stakeLands.address, ethers.constants.MaxUint256);
 
   // set v1 and v2
-  await stakeLands.setV1(STAKING_LAND_V1[currentChain]);
-  await stakeLands.setV2(STAKING_LAND_V2[currentChain]);
+  // await stakeLands.setV1(STAKING_LAND_V1[currentChain]);
+  // await stakeLands.setV2(STAKING_LAND_V2[currentChain]);
 }
 
 main().catch((error) => {
